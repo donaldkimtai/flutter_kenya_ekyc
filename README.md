@@ -197,28 +197,6 @@ await _ekyc.configure(
 5. **Face Comparison**: MobileFaceNet generates embeddings and compares faces
 6. **Result Generation**: Confidence scores and verification status returned
 
-## 🎯 Use Cases
-
-### Financial Services
-- Bank account opening and KYC compliance
-- Mobile money wallet registration
-- Loan application processing
-- Insurance policy registration
-
-### Telecommunications
-- SIM card registration (meeting regulatory requirements)
-- Mobile number porting verification
-- Device financing identity checks
-
-### Government Services
-- Digital service access verification
-- Benefits enrollment
-- Voter registration support
-
-### E-Commerce & Gig Economy
-- Seller/driver verification
-- Age verification for restricted products
-- Payment account setup
 
 ## 📊 Performance
 
@@ -238,54 +216,17 @@ await _ekyc.configure(
 - GDPR-ready data handling
 
 ## 🤝 Contributing
+welcome to contributions!
 
-We welcome contributions! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-Please ensure your code follows the existing style and includes appropriate tests.
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
-## 🙏 Acknowledgments
 
-- Google ML Kit team for the powerful OCR capabilities
-- MobileFaceNet authors for the efficient face recognition model
-- Kenyan fintech community for feedback and requirements
-- Flutter team for the amazing framework
 
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/donaldkimtai/flutter_kenya_ekyc/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/donaldkimtai/flutter_kenya_ekyc/discussions)
-- **Documentation**: [Wiki](https://github.com/donaldkimtai/flutter_kenya_ekyc/wiki)
-
-## 🗺️ Roadmap
-
-- [ ] Support for Kenyan Alien ID cards
-- [ ] Integration with IPRS (Integrated Population Registration System)
-- [ ] Multi-language support (English, Swahili, and local languages)
-- [ ] Enhanced liveness detection algorithms
-- [ ] Document authenticity verification (hologram detection)
-- [ ] Cloud backup option for verification results
-- [ ] React Native bridge for cross-platform support
-
-## ⚖️ Legal & Compliance
-
-This package is designed to help applications comply with:
-- Kenya's Data Protection Act, 2019
-- Central Bank of Kenya KYC requirements
-- Communications Authority of Kenya SIM registration regulations
-- Anti-Money Laundering regulations
 
 **Disclaimer**: Users are responsible for ensuring their implementation complies with all applicable laws and regulations. This package is a tool and does not constitute legal advice.
 
 ---
 
-Made with ❤️ in Kenya 🇰🇪
