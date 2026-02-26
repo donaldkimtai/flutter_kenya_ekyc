@@ -247,7 +247,7 @@ We welcome contributions! Please follow these steps:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and development process.
+Please ensure your code follows the existing style and includes appropriate tests.
 
 ## 📝 License
 
@@ -263,9 +263,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - **Issues**: [GitHub Issues](https://github.com/donaldkimtai/flutter_kenya_ekyc/issues)
-- **Email**: support@flutter-kenya-ekyc.dev
+- **Discussions**: [GitHub Discussions](https://github.com/donaldkimtai/flutter_kenya_ekyc/discussions)
 - **Documentation**: [Wiki](https://github.com/donaldkimtai/flutter_kenya_ekyc/wiki)
-- **Community**: [Discussions](https://github.com/donaldkimtai/flutter_kenya_ekyc/discussions)
 
 ## 🗺️ Roadmap
 
