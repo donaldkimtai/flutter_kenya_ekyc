@@ -1,0 +1,33 @@
+name: flutter_kenya_ekyc
+description: Modern Kenyan Identity & Document Verification Engine (Face, ID, Logbook, License)
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Modern Camera & Image Processing
+  camera: ^0.10.5+9
+  image: ^4.1.4
+  path_provider: ^2.1.2
+  
+  # Modern Google ML Kit (Faces AND Documents)
+  google_mlkit_face_detection: ^0.11.0
+  google_mlkit_text_recognition: ^0.13.0
+  
+  # Modern TFLite for Anti-Spoofing & Face Match
+  tflite_flutter: ^0.10.4
+
+flutter:
+  uses-material-design: true
+  assets: 
+    - assets/
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
