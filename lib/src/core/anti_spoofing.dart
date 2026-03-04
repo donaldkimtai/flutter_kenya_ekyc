@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:tflite_flutter/tflite_flutter.dart' as tfl;
 import 'package:image/image.dart' as imglib;
 
+/// Utility class for handling Passive Liveness checks via TFLite.
 class FaceAntiSpoofing {
   FaceAntiSpoofing._();
 
@@ -15,6 +16,7 @@ class FaceAntiSpoofing {
   static late tfl.Interpreter interpreter;
   static bool isModelLoaded = false;
 
+  /// Loads the anti-spoofing model from assets.
   static Future<void> loadSpoofModel() async {
     try {
       interpreter = await tfl.Interpreter.fromAsset(MODEL_FILE);
@@ -24,6 +26,7 @@ class FaceAntiSpoofing {
     }
   }
 
+  /// Analyzes a cropped face image to determine if it is a live person or a spoof.
   static String antiSpoofing(imglib.Image? bitmapCrop) {
     if (bitmapCrop == null || !isModelLoaded) return "Initialization Error";
 
