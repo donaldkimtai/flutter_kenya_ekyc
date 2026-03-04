@@ -1,94 +1,157 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../core/frame_status.dart';
 import '../models/document_types.dart';
 
-/// A custom painter that draws context-aware bounding boxes and corner brackets 
-/// for the eKYC scanning interface.
+/// Draws the transparent cutout overlay and animated border for the camera UI.
+///
+/// Receives [previewRect] — the exact pixel bounds where the camera preview
+/// renders on screen (accounting for letterboxing). All cutout geometry is
+/// computed relative to this rect so the document box and face oval always
+/// align with what the camera actually sees, regardless of screen aspect ratio.
 class OverlayPainter extends CustomPainter {
-  /// The current state of the scanning process.
   final FrameStatus status;
-
-  /// Whether the user is currently in the selfie/liveness phase.
   final bool isLivenessPhase;
-
-  /// The type of document being scanned (determines the aspect ratio).
   final KenyanDocumentType documentType;
+  final double livenessProgress;
 
-  OverlayPainter({
+  /// The exact screen rect where the camera image is rendered.
+  /// Provided by the view using LayoutBuilder so we can align the cutout.
+  final Rect previewRect;
+
+  const OverlayPainter({
     required this.status,
     required this.isLivenessPhase,
     required this.documentType,
+    required this.livenessProgress,
+    required this.previewRect,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Determine the color based on the current frame status
-    Color strokeColor = Colors.white;
-    if (status == FrameStatus.success) strokeColor = Colors.greenAccent;
-    if (status == FrameStatus.eyesClosed || status == FrameStatus.processing) {
-      strokeColor = Colors.amber;
-    }
-    if (status == FrameStatus.spoofingDetected || status == FrameStatus.documentNotFound) {
-      strokeColor = Colors.redAccent;
+    // Work in preview-relative coordinates so the cutout sits inside
+    // the actual camera feed, not the full screen (which includes black bars).
+    final Offset center = previewRect.center;
+    final double previewW = previewRect.width;
+    final double previewH = previewRect.height;
+
+    // ── Cutout geometry ────────────────────────────────────────────────────
+
+    // Document aspect ratios (width / height):
+    //   ID card / licence: ISO/IEC 7810 ID-1 = 85.6 × 54 mm ≈ 1.585
+    //   PSV badge: roughly square
+    //   Logbook: A5-ish landscape ≈ 1.4
+    double boxWidth = previewW * 0.85;
+    double boxHeight;
+    switch (documentType) {
+      case KenyanDocumentType.ntsaLogbook:
+        boxHeight = boxWidth / 1.4;
+        break;
+      case KenyanDocumentType.psvBadge:
+        boxHeight = boxWidth * 0.9;
+        break;
+      default: // nationalIdFront, nationalIdBack, drivingLicense
+        boxHeight = boxWidth / 1.585;
     }
 
-    final paint = Paint()
-      ..color = strokeColor
-      ..strokeWidth = 4.0
+    // Cap height so the box never exceeds 80% of the preview height
+    if (boxHeight > previewH * 0.80) {
+      boxHeight = previewH * 0.80;
+      boxWidth = boxHeight * 1.585;
+    }
+
+    final double livenessRadius = previewW * 0.40;
+
+    final Path cutout = Path();
+    if (isLivenessPhase) {
+      cutout.addOval(
+          Rect.fromCircle(center: center, radius: livenessRadius));
+    } else {
+      cutout.addRRect(RRect.fromRectAndRadius(
+        Rect.fromCenter(
+            center: center, width: boxWidth, height: boxHeight),
+        const Radius.circular(16),
+      ));
+    }
+
+    // ── Full-screen dark overlay with transparent hole punch ──────────────
+    canvas.saveLayer(
+        Rect.fromLTWH(0, 0, size.width, size.height), Paint());
+    canvas.drawPaint(Paint()..color = Colors.black.withOpacity(0.80));
+    canvas.drawPath(cutout, Paint()..blendMode = BlendMode.clear);
+    canvas.restore();
+
+    // ── Border colour ─────────────────────────────────────────────────────
+    Color stroke = Colors.white;
+    if (status == FrameStatus.success) stroke = Colors.greenAccent;
+    if (status == FrameStatus.eyesClosed ||
+        status == FrameStatus.processing) {
+      stroke = Colors.amber;
+    }
+    if (status == FrameStatus.spoofingDetected ||
+        status == FrameStatus.documentNotFound ||
+        status == FrameStatus.timeout) {
+      stroke = Colors.redAccent;
+    }
+
+    final Paint borderPaint = Paint()
+      ..color = stroke
+      ..strokeWidth = 3.5
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    final center = Offset(size.width / 2, size.height / 2);
-
+    // ── Draw border / progress arc ────────────────────────────────────────
     if (isLivenessPhase) {
-      // Draw a sleek circular/oval frame for the Face/Liveness phase
-      final radius = size.width * 0.35;
-      canvas.drawCircle(center, radius, paint);
-    } else {
-      // Draw document-specific corner brackets
-      double width;
-      double height;
+      canvas.drawPath(cutout, borderPaint);
 
-      if (documentType == KenyanDocumentType.ntsaLogbook) {
-        // Logbooks are large A4 portrait documents
-        width = size.width * 0.85;
-        height = size.height * 0.65;
-      } else {
-        // Kenyan IDs and Driving Licenses are standard credit-card landscape
-        width = size.width * 0.85;
-        height = width * 0.63; // Standard ID aspect ratio
+      if (livenessProgress > 0) {
+        canvas.drawArc(
+          Rect.fromCircle(center: center, radius: livenessRadius),
+          -pi / 2,
+          2 * pi * livenessProgress,
+          false,
+          Paint()
+            ..color = Colors.greenAccent
+            ..strokeWidth = 7.0
+            ..style = PaintingStyle.stroke
+            ..strokeCap = StrokeCap.round,
+        );
       }
-
-      final rect = Rect.fromCenter(center: center, width: width, height: height);
-      _drawCornerBrackets(canvas, rect, paint);
+    } else {
+      final Rect docRect = Rect.fromCenter(
+          center: center, width: boxWidth, height: boxHeight);
+      _drawCornerBrackets(canvas, docRect, borderPaint);
     }
   }
 
-  /// Draws professional corner brackets `[ ]` instead of a full solid rectangle.
   void _drawCornerBrackets(Canvas canvas, Rect rect, Paint paint) {
-    const double cornerLength = 30.0;
-
-    // Top Left
-    canvas.drawLine(rect.topLeft, rect.topLeft + const Offset(cornerLength, 0), paint);
-    canvas.drawLine(rect.topLeft, rect.topLeft + const Offset(0, cornerLength), paint);
-
-    // Top Right
-    canvas.drawLine(rect.topRight, rect.topRight + const Offset(-cornerLength, 0), paint);
-    canvas.drawLine(rect.topRight, rect.topRight + const Offset(0, cornerLength), paint);
-
-    // Bottom Left
-    canvas.drawLine(rect.bottomLeft, rect.bottomLeft + const Offset(cornerLength, 0), paint);
-    canvas.drawLine(rect.bottomLeft, rect.bottomLeft + const Offset(0, -cornerLength), paint);
-
-    // Bottom Right
-    canvas.drawLine(rect.bottomRight, rect.bottomRight + const Offset(-cornerLength, 0), paint);
-    canvas.drawLine(rect.bottomRight, rect.bottomRight + const Offset(0, -cornerLength), paint);
+    const double len = 24.0;
+    // Top-left
+    canvas.drawLine(rect.topLeft, rect.topLeft + const Offset(len, 0), paint);
+    canvas.drawLine(rect.topLeft, rect.topLeft + const Offset(0, len), paint);
+    // Top-right
+    canvas.drawLine(
+        rect.topRight, rect.topRight + const Offset(-len, 0), paint);
+    canvas.drawLine(
+        rect.topRight, rect.topRight + const Offset(0, len), paint);
+    // Bottom-left
+    canvas.drawLine(
+        rect.bottomLeft, rect.bottomLeft + const Offset(len, 0), paint);
+    canvas.drawLine(
+        rect.bottomLeft, rect.bottomLeft + const Offset(0, -len), paint);
+    // Bottom-right
+    canvas.drawLine(
+        rect.bottomRight, rect.bottomRight + const Offset(-len, 0), paint);
+    canvas.drawLine(
+        rect.bottomRight, rect.bottomRight + const Offset(0, -len), paint);
   }
 
   @override
-  bool shouldRepaint(covariant OverlayPainter oldDelegate) {
-    return oldDelegate.status != status || 
-           oldDelegate.isLivenessPhase != isLivenessPhase ||
-           oldDelegate.documentType != documentType;
+  bool shouldRepaint(covariant OverlayPainter old) {
+    return old.status != status ||
+        old.isLivenessPhase != isLivenessPhase ||
+        old.livenessProgress != livenessProgress ||
+        old.documentType != documentType ||
+        old.previewRect != previewRect;
   }
 }

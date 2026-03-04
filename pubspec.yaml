@@ -1,7 +1,7 @@
 name: flutter_kenya_ekyc
-description: Modern Kenyan Identity & Document Verification Engine (Face, ID, Logbook, License)
+description: Modern Kenyan Identity & Document Verification Engine (Face, ID, Logbook, Licence, PSV)
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.0.0+1
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -9,28 +9,41 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
-  # Modern Camera & Image Processing
+
+  # Camera & image processing
   camera: ^0.10.5+9
   image: ^4.1.4
   path_provider: ^2.1.2
-  
-  # Modern Google ML Kit (Faces AND Documents)
+
+  # ML Kit — face detection + OCR
   google_mlkit_face_detection: ^0.11.0
   google_mlkit_text_recognition: ^0.13.0
-  
-  # Modern TFLite for Anti-Spoofing & Face Match
+
+  # TFLite — anti-spoofing + face embeddings
   tflite_flutter: ^0.12.1
+
+  # JSON serialisation
   json_annotation: ^4.11.0
 
-flutter:
-  uses-material-design: true
-  assets: 
-    - assets/
-
+  # Firebase (uncomment when ready to wire up)
+  firebase_core: ^2.32.0
+  cloud_firestore: ^4.17.5
+  firebase_storage: ^11.7.7
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   build_runner: ^2.11.1
   json_serializable: ^6.13.0
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  
+  # Flutter does NOT recursively bundle an 'assets/' wildcard on release builds.
+  assets:
+    - assets/FaceAntiSpoofing.tflite
+    - assets/mobilefacenet.tflite
+    - assets/background.jpg
+    - assets/face.jpg
