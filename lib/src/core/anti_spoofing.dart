@@ -1,113 +1,156 @@
-import 'dart:core';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:tflite_flutter/tflite_flutter.dart' as tfl;
 import 'package:image/image.dart' as imglib;
 
-/// Utility class for handling Passive Liveness checks via TFLite.
+/// Utility class for Passive Liveness checks via TFLite anti-spoofing model.
+///
+/// Detects printed photos, phone screens, and other presentation attacks
+/// before the face match step runs.
 class FaceAntiSpoofing {
   FaceAntiSpoofing._();
 
-  static const String MODEL_FILE = "FaceAntiSpoofing.tflite";
-  static const int INPUT_IMAGE_SIZE = 256; 
-  static const double THRESHOLD = 0.2; 
-  static const int LAPLACE_THRESHOLD = 50; 
-  static const int LAPLACIAN_THRESHOLD = 1000; 
-  
-  static late tfl.Interpreter interpreter;
+  static const String _modelFile = 'assets/FaceAntiSpoofing.tflite';
+  static const int _inputSize = 256;
+
+  /// Score below this = live person. Above = spoofing attempt.
+  static const double _spoofThreshold = 0.2;
+
+  /// Laplacian score below this = image too blurry to analyse.
+  static const int _blurThreshold = 1000;
+
+  /// Per-pixel edge intensity threshold for the Laplacian kernel.
+  static const int _lapEdgeThreshold = 50;
+
+  static tfl.Interpreter? _interpreter;
   static bool isModelLoaded = false;
 
-  /// Loads the anti-spoofing model from assets.
+  /// Loads the anti-spoofing TFLite model from app assets.
   static Future<void> loadSpoofModel() async {
     try {
-      interpreter = await tfl.Interpreter.fromAsset(MODEL_FILE);
+      _interpreter = await tfl.Interpreter.fromAsset(_modelFile);
       isModelLoaded = true;
+      debugPrint('[FaceAntiSpoofing] Model loaded successfully.');
     } catch (e) {
       isModelLoaded = false;
+      debugPrint('[FaceAntiSpoofing] Model load error: $e');
     }
   }
 
-  /// Analyzes a cropped face image to determine if it is a live person or a spoof.
+  /// Analyses a cropped face image. Returns one of:
+  /// - `"Live Person Detected"` — passes liveness
+  /// - `"Spoofing Detected"` — printed/screen attack
+  /// - `"Too Blurry"` — image quality too low
+  /// - `"Not Ready"` — model not loaded yet
+  /// - `"Error Processing Face"` — unexpected runtime error
   static String antiSpoofing(imglib.Image? bitmapCrop) {
-    if (bitmapCrop == null || !isModelLoaded) return "Initialization Error";
+    if (bitmapCrop == null) return 'Error Processing Face';
+    if (!isModelLoaded || _interpreter == null) return 'Not Ready';
 
-    int laplaceScore = laplacian(bitmapCrop);
-    if (laplaceScore < LAPLACIAN_THRESHOLD) return "Too Blurry";
+    final int sharpness = _laplacianSharpness(bitmapCrop);
+    if (sharpness < _blurThreshold) return 'Too Blurry';
 
-    double spoofScore = _runAntiSpoofingModel(bitmapCrop);
-    
-    if (spoofScore < 0) return "Error Processing Face";
-    return spoofScore < THRESHOLD ? "Live Person Detected" : "Spoofing Detected";
+    final double score = _runModel(bitmapCrop);
+    if (score < 0) return 'Error Processing Face';
+
+    return score < _spoofThreshold ? 'Live Person Detected' : 'Spoofing Detected';
   }
 
-  static double _runAntiSpoofingModel(imglib.Image bitmap) {
-    imglib.Image bitmapScale = imglib.copyResizeCropSquare(bitmap, size: INPUT_IMAGE_SIZE);
-    var imgBytes = normalizeImage(bitmapScale);
-
-    var input = [imgBytes.reshape([1, INPUT_IMAGE_SIZE, INPUT_IMAGE_SIZE, 3])];
-    var clssPred = List.generate(1, (_) => List.filled(8, 0.0));
-    var leafNodeMask = List.generate(1, (_) => List.filled(8, 0.0));
-
-    Map<int, Object> outputs = {
-      interpreter.getOutputIndex("Identity"): clssPred,
-      interpreter.getOutputIndex("Identity_1"): leafNodeMask,
-    };
-
+  static double _runModel(imglib.Image bitmap) {
     try {
-      interpreter.runForMultipleInputs(input, outputs);
-      return _calculateLeafScore(clssPred, leafNodeMask);
+      final imglib.Image scaled =
+          imglib.copyResizeCropSquare(bitmap, size: _inputSize);
+      final Float32List imgBytes = _normalizeImage(scaled);
+
+      // Input tensor: [1, 256, 256, 3]
+      final input = [
+        imgBytes.reshape([1, _inputSize, _inputSize, 3])
+      ];
+
+      final List<List<double>> clssPred =
+          List.generate(1, (_) => List.filled(8, 0.0));
+      final List<List<double>> leafNodeMask =
+          List.generate(1, (_) => List.filled(8, 0.0));
+
+      // FIX: Use index-based output lookup instead of getOutputIndex("Identity")
+      // which throws if the model uses unnamed/quantized tensors.
+      final Map<int, Object> outputs = {
+        0: clssPred,
+        1: leafNodeMask,
+      };
+
+      _interpreter!.runForMultipleInputs(input, outputs);
+      return _leafScore(clssPred, leafNodeMask);
     } catch (e) {
+      debugPrint('[FaceAntiSpoofing] Model run error: $e');
       return -1.0;
     }
   }
 
-  static double _calculateLeafScore(List<List<double>> clssPred, List<List<double>> leafNodeMask) {
+  static double _leafScore(
+    List<List<double>> clssPred,
+    List<List<double>> leafNodeMask,
+  ) {
     double score = 0.0;
-    for (var i = 0; i < 8; i++) {
-      double absVar = (clssPred[0][i]).abs();
-      score += absVar * leafNodeMask[0][i];
+    for (int i = 0; i < 8; i++) {
+      score += clssPred[0][i].abs() * leafNodeMask[0][i];
     }
     return score;
   }
 
-  static Float32List normalizeImage(imglib.Image bitmap) {
-    var h = bitmap.height;
-    var w = bitmap.width;
-    var convertedBytes = Float32List(1 * h * w * 3);
-    var buffer = Float32List.view(convertedBytes.buffer);
-    var imageStd = 128.0;
-    var pixelIndex = 0;
-
-    for (var i = 0; i < h; i++) { 
-      for (var j = 0; j < w; j++) {
-        var pixel = bitmap.getPixel(j, i);
-        buffer[pixelIndex++] = (pixel.r - imageStd) / imageStd;
-        buffer[pixelIndex++] = (pixel.g - imageStd) / imageStd;
-        buffer[pixelIndex++] = (pixel.b - imageStd) / imageStd;
+  static Float32List _normalizeImage(imglib.Image bitmap) {
+    const double imageStd = 128.0;
+    final h = bitmap.height;
+    final w = bitmap.width;
+    final convertedBytes = Float32List(h * w * 3);
+    int pixelIndex = 0;
+    for (int i = 0; i < h; i++) {
+      for (int j = 0; j < w; j++) {
+        final pixel = bitmap.getPixel(j, i);
+        convertedBytes[pixelIndex++] = (pixel.r - imageStd) / imageStd;
+        convertedBytes[pixelIndex++] = (pixel.g - imageStd) / imageStd;
+        convertedBytes[pixelIndex++] = (pixel.b - imageStd) / imageStd;
       }
     }
-    return convertedBytes.buffer.asFloat32List();
+    return convertedBytes;
   }
 
-  static int laplacian(imglib.Image bitmap) {
-    imglib.Image bitmapScale = imglib.copyResizeCropSquare(bitmap, size: INPUT_IMAGE_SIZE);
-    var laplace = [[0, 1, 0], [1, -4, 1], [0, 1, 0]];
-    int size = laplace.length;
-    var img = imglib.grayscale(bitmapScale);
-    int height = img.height;
-    int width = img.width;
+  /// Computes the Laplacian sharpness score of an image.
+  /// Higher = sharper. Used to reject blurry/low-quality frames.
+  static int _laplacianSharpness(imglib.Image bitmap) {
+    final imglib.Image scaled =
+        imglib.copyResizeCropSquare(bitmap, size: _inputSize);
+    final imglib.Image grey = imglib.grayscale(scaled);
 
+    const kernel = [
+      [0, 1, 0],
+      [1, -4, 1],
+      [0, 1, 0]
+    ];
+    const kSize = 3;
+    final h = grey.height;
+    final w = grey.width;
     int score = 0;
-    for (int x = 0; x < height - size + 1; x++){
-      for (int y = 0; y < width - size + 1; y++){
+
+    for (int x = 0; x < h - kSize + 1; x++) {
+      for (int y = 0; y < w - kSize + 1; y++) {
         int result = 0;
-        for (int i = 0; i < size; i++){
-          for (int j = 0; j < size; j++){
-            result += (img.getPixel(x + i, y + j).r.toInt() & 0xFF) * laplace[i][j];
+        for (int i = 0; i < kSize; i++) {
+          for (int j = 0; j < kSize; j++) {
+            result +=
+                (grey.getPixel(x + i, y + j).r.toInt() & 0xFF) * kernel[i][j];
           }
         }
-        if (result > LAPLACE_THRESHOLD) score++;
+        if (result > _lapEdgeThreshold) score++;
       }
     }
     return score;
+  }
+
+  /// Releases the TFLite interpreter.
+  static void dispose() {
+    _interpreter?.close();
+    _interpreter = null;
+    isModelLoaded = false;
   }
 }
