@@ -16,9 +16,11 @@ import '../models/kenyan_id_data.dart';
 import '../models/ntsa_logbook_data.dart';
 import '../models/psv_badge_data.dart';
 import '../models/driving_license_data.dart';
+import '../models/psv_insurance_data.dart';
 import '../parsers/kenyan_id_parser.dart';
 import '../parsers/logbook_parser.dart';
 import '../parsers/psv_badge_parser.dart';
+import '../parsers/psv_insurance_parser.dart';
 import '../parsers/driving_license_parser.dart';
 
 // ============================================================================
@@ -195,10 +197,7 @@ class EkycWizardController extends ChangeNotifier {
         return 'Weka Leseni kwenye mraba\n(Align Driving Licence in frame)';
       case KenyanDocumentType.psvBadge:
         return 'Weka Beji ya PSV kwenye mraba\n(Align PSV Badge in frame)';
-      case KenyanDocumentType.psvInsurance:
-        return 'Weka Hati ya Bima ya PSV kwenye mraba\n(Align PSV Insurance in frame)';
-      case KenyanDocumentType.nationalIdFront:
-      case KenyanDocumentType.nationalIdBack:
+      default:
         return 'Weka Kitambulisho kwenye mraba\n(Align your ID in frame)';
     }
   }
@@ -227,6 +226,7 @@ class EkycWizardController extends ChangeNotifier {
     KenyaIdParser.dispose();
     LogbookParser.dispose();
     PsvBadgeParser.dispose();
+    PsvInsuranceParser.dispose();
     DrivingLicenseParser.dispose();
     FaceNetService.close();
     FaceAntiSpoofing.dispose();
@@ -392,8 +392,9 @@ class EkycWizardController extends ChangeNotifier {
         break;
 
       case KenyanDocumentType.psvInsurance:
-        // Handle PSV Insurance document parsing
-        docData = null; // Update with actual parser when available
+        final PsvInsuranceData? insData =
+            await PsvInsuranceParser.parse(inputImage);
+        docData = insData?.toMap();
         break;
     }
 
