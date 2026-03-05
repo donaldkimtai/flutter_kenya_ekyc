@@ -16,9 +16,11 @@ import '../models/kenyan_id_data.dart';
 import '../models/ntsa_logbook_data.dart';
 import '../models/psv_badge_data.dart';
 import '../models/driving_license_data.dart';
+import '../models/psv_insurance_data.dart';
 import '../parsers/kenyan_id_parser.dart';
 import '../parsers/logbook_parser.dart';
 import '../parsers/psv_badge_parser.dart';
+import '../parsers/psv_insurance_parser.dart';
 import '../parsers/driving_license_parser.dart';
 
 // ============================================================================
@@ -224,6 +226,7 @@ class EkycWizardController extends ChangeNotifier {
     KenyaIdParser.dispose();
     LogbookParser.dispose();
     PsvBadgeParser.dispose();
+    PsvInsuranceParser.dispose();
     DrivingLicenseParser.dispose();
     FaceNetService.close();
     FaceAntiSpoofing.dispose();
@@ -386,6 +389,12 @@ class EkycWizardController extends ChangeNotifier {
         final PsvBadgeData? data =
             await PsvBadgeParser.parseDocument(inputImage);
         docData = data?.toJson();
+        break;
+
+      case KenyanDocumentType.psvInsurance:
+        final PsvInsuranceData? insData =
+            await PsvInsuranceParser.parse(inputImage);
+        docData = insData?.toMap();
         break;
     }
 

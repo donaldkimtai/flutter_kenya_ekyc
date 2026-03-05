@@ -14,4 +14,8 @@ enum KenyanDocumentType {
 
   /// A PSV (Public Service Vehicle) Badge.
   psvBadge,
+
+  psvInsurance,
 }
+
+
