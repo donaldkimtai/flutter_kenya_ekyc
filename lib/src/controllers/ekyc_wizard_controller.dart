@@ -195,7 +195,10 @@ class EkycWizardController extends ChangeNotifier {
         return 'Weka Leseni kwenye mraba\n(Align Driving Licence in frame)';
       case KenyanDocumentType.psvBadge:
         return 'Weka Beji ya PSV kwenye mraba\n(Align PSV Badge in frame)';
-      default:
+      case KenyanDocumentType.psvInsurance:
+        return 'Weka Hati ya Bima ya PSV kwenye mraba\n(Align PSV Insurance in frame)';
+      case KenyanDocumentType.nationalIdFront:
+      case KenyanDocumentType.nationalIdBack:
         return 'Weka Kitambulisho kwenye mraba\n(Align your ID in frame)';
     }
   }
@@ -386,6 +389,11 @@ class EkycWizardController extends ChangeNotifier {
         final PsvBadgeData? data =
             await PsvBadgeParser.parseDocument(inputImage);
         docData = data?.toJson();
+        break;
+
+      case KenyanDocumentType.psvInsurance:
+        // Handle PSV Insurance document parsing
+        docData = null; // Update with actual parser when available
         break;
     }
 
