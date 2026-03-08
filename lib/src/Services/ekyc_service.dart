@@ -6,14 +6,6 @@ import '../services/firebase_ekyc_uploader.dart';
 
 /// High-level entry point for the eKYC engine.
 ///
-/// This is the **only class your Bodago Rider app needs to import**.
-/// It wraps [EkycWizardView], handles navigation, and optionally
-/// uploads the result to Firebase when complete.
-///
-/// ### Bodago Rider usage
-/// ```dart
-/// import 'package:flutter_kenya_ekyc/flutter_kenya_ekyc.dart';
-///
 /// final result = await EkycService.launch(
 ///   context,
 ///   documentType: KenyanDocumentType.drivingLicense,
