@@ -45,5 +45,5 @@ flutter:
   assets:
     - assets/FaceAntiSpoofing.tflite
     - assets/mobilefacenet.tflite
-    - assets/background.jpg
-    - assets/face.jpg
+    #- assets/background.jpg
+    #- assets/face.jpg
