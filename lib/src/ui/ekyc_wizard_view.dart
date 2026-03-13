@@ -7,18 +7,6 @@ import '../models/document_types.dart';
 import 'overlay_painter.dart';
 
 /// The camera-based UI for the full eKYC verification flow.
-///
-/// Usage from Bodago Rider (or any Flutter app):
-/// ```dart
-/// final result = await Navigator.of(context).push(
-///   MaterialPageRoute(
-///     builder: (_) => EkycWizardView(
-///       targetDocumentType: KenyanDocumentType.drivingLicense,
-///     ),
-///   ),
-/// );
-/// ```
-/// [result] will be an [EkycVerificationResult] or `null` if the user cancelled.
 class EkycWizardView extends StatefulWidget {
   final KenyanDocumentType targetDocumentType;
 
@@ -81,9 +69,6 @@ class _EkycWizardViewState extends State<EkycWizardView> {
       case FrameStatus.processing:
         return _controller.promptInstruction;
       case FrameStatus.documentNotFound:
-        if (_controller.isDocumentPhaseComplete) {
-          return _controller.promptInstruction;
-        }
         return _controller.promptInstruction;
       case FrameStatus.documentTooSmall:
         return 'Karibishe zaidi\n(Move closer to the document)';
@@ -148,55 +133,43 @@ class _EkycWizardViewState extends State<EkycWizardView> {
               _controller.cameraController!.description.lensDirection ==
                   CameraLensDirection.front;
 
-          // FIX: The camera outputs 4:3 but the phone screen is 20:9.
-          // We use LayoutBuilder to find the exact pixel bounds where the
-          // camera preview actually renders, then draw the overlay ON TOP of
-          // that same area — so the document cutout aligns with what the camera
-          // sees instead of floating over black letterbox bars.
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final double screenW = constraints.maxWidth;
-              final double screenH = constraints.maxHeight;
+          // 🔥 THE ASPECT RATIO FIX 🔥
+          // Get the raw aspect ratio from the camera sensor
+          double camAspect = _controller.cameraController!.value.aspectRatio;
+          
+          // Flutter's camera plugin always returns width > height (landscape ratio).
+          // If the phone is held in portrait, we must invert the ratio to prevent zooming!
+          final bool isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
+          if (isPortrait && camAspect > 1.0) {
+            camAspect = 1.0 / camAspect;
+          }
 
-              // Camera aspect ratio (width / height) from the controller
-              final double camAspect =
-                  _controller.cameraController!.value.aspectRatio;
-
-              // Compute the actual rendered preview size (letterboxed)
-              double previewW = screenW;
-              double previewH = screenW / camAspect;
-              if (previewH > screenH) {
-                previewH = screenH;
-                previewW = screenH * camAspect;
-              }
-              final double offsetX = (screenW - previewW) / 2;
-              final double offsetY = (screenH - previewH) / 2;
-
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-              // Black background
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              // Black background covers the letterboxed edges
               Container(color: Colors.black),
 
-              // Camera preview — exact letterboxed size
-              Positioned(
-                left: offsetX,
-                top: offsetY,
-                width: previewW,
-                height: previewH,
-                child: CameraPreview(_controller.cameraController!),
-              ),
-
-              // Overlay — drawn over the full screen (black bars + preview)
-              // but cutout geometry uses previewW/previewH so the rectangle
-              // aligns exactly with the camera feed area.
-              CustomPaint(
-                painter: OverlayPainter(
-                  status: _controller.currentStatus,
-                  isLivenessPhase: isLivenessPhase,
-                  documentType: widget.targetDocumentType,
-                  livenessProgress: _controller.livenessProgress,
-                  previewRect: Rect.fromLTWH(offsetX, offsetY, previewW, previewH),
+              // Center the AspectRatio so it fits perfectly on screen without cropping
+              Center(
+                child: AspectRatio(
+                  aspectRatio: camAspect,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CameraPreview(_controller.cameraController!),
+                      
+                      // The overlay is now drawn EXACTLY over the preview area
+                      CustomPaint(
+                        painter: OverlayPainter(
+                          status: _controller.currentStatus,
+                          isLivenessPhase: isLivenessPhase,
+                          documentType: widget.targetDocumentType,
+                          livenessProgress: _controller.livenessProgress,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
@@ -258,9 +231,7 @@ class _EkycWizardViewState extends State<EkycWizardView> {
                 ),
               ),
             ],
-          ); // Stack
-            }, // LayoutBuilder builder
-          ); // LayoutBuilder
+          );
         },
       ),
     );

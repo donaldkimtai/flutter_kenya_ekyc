@@ -5,42 +5,28 @@ import '../models/document_types.dart';
 
 /// Draws the transparent cutout overlay and animated border for the camera UI.
 ///
-/// Receives [previewRect] — the exact pixel bounds where the camera preview
-/// renders on screen (accounting for letterboxing). All cutout geometry is
-/// computed relative to this rect so the document box and face oval always
-/// align with what the camera actually sees, regardless of screen aspect ratio.
+/// Because this is nested inside the AspectRatio widget with the CameraPreview,
+/// the [size] variable perfectly matches the camera feed dimensions.
 class OverlayPainter extends CustomPainter {
   final FrameStatus status;
   final bool isLivenessPhase;
   final KenyanDocumentType documentType;
   final double livenessProgress;
 
-  /// The exact screen rect where the camera image is rendered.
-  /// Provided by the view using LayoutBuilder so we can align the cutout.
-  final Rect previewRect;
-
   const OverlayPainter({
     required this.status,
     required this.isLivenessPhase,
     required this.documentType,
     required this.livenessProgress,
-    required this.previewRect,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Work in preview-relative coordinates so the cutout sits inside
-    // the actual camera feed, not the full screen (which includes black bars).
-    final Offset center = previewRect.center;
-    final double previewW = previewRect.width;
-    final double previewH = previewRect.height;
+    final Offset center = Offset(size.width / 2, size.height / 2);
+    final double previewW = size.width;
+    final double previewH = size.height;
 
     // ── Cutout geometry ────────────────────────────────────────────────────
-
-    // Document aspect ratios (width / height):
-    //   ID card / licence: ISO/IEC 7810 ID-1 = 85.6 × 54 mm ≈ 1.585
-    //   PSV badge: roughly square
-    //   Logbook: A5-ish landscape ≈ 1.4
     double boxWidth = previewW * 0.85;
     double boxHeight;
     switch (documentType) {
@@ -151,7 +137,6 @@ class OverlayPainter extends CustomPainter {
     return old.status != status ||
         old.isLivenessPhase != isLivenessPhase ||
         old.livenessProgress != livenessProgress ||
-        old.documentType != documentType ||
-        old.previewRect != previewRect;
+        old.documentType != documentType;
   }
 }
